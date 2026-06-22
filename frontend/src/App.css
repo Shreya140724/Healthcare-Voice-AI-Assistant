@@ -1,0 +1,308 @@
+/* ==========================================
+   GLOBAL
+========================================== */
+
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+}
+
+body{
+  font-family:'Segoe UI',sans-serif;
+  background:#0f172a;
+  color:white;
+}
+
+/* ==========================================
+   CONTAINER
+========================================== */
+
+.container{
+  width:95%;
+  max-width:1400px;
+  margin:auto;
+  padding:25px;
+}
+
+h1{
+  text-align:center;
+  font-size:42px;
+  margin-bottom:25px;
+  color:white;
+}
+
+/* ==========================================
+   DASHBOARD LAYOUT
+========================================== */
+
+.dashboard{
+  display:grid;
+  grid-template-columns:350px 1fr;
+  gap:25px;
+  align-items:start;
+}
+
+/* ==========================================
+   LEFT PANEL
+========================================== */
+
+.left-panel{
+  width:100%;
+}
+
+.avatar-card{
+  background:#111827;
+  border-radius:20px;
+  padding:20px;
+  text-align:center;
+  border:1px solid rgba(255,255,255,.08);
+}
+
+/* ==========================================
+   AVATAR
+========================================== */
+
+.avatar-video{
+  width:100%;
+  max-width:300px;
+  height:300px;
+  object-fit:cover;
+  border-radius:20px;
+  border:3px solid #2563eb;
+  box-shadow:
+    0 0 25px rgba(37,99,235,.35);
+  display:block;
+  margin:auto;
+}
+
+.status{
+  margin-top:15px;
+  font-size:18px;
+  font-weight:600;
+  color:#e5e7eb;
+}
+
+/* ==========================================
+   RIGHT PANEL
+========================================== */
+
+.right-panel{
+  width:100%;
+}
+
+/* ==========================================
+   CHAT BOX
+========================================== */
+
+.chat-box{
+  height:550px;
+  overflow-y:auto;
+
+  background:#111827;
+
+  border-radius:20px;
+
+  padding:20px;
+
+  border:
+    1px solid rgba(255,255,255,.08);
+}
+
+/* Scrollbar */
+
+.chat-box::-webkit-scrollbar{
+  width:8px;
+}
+
+.chat-box::-webkit-scrollbar-thumb{
+  background:#374151;
+  border-radius:10px;
+}
+
+/* ==========================================
+   MESSAGE ROWS
+========================================== */
+
+.message-row{
+  display:flex;
+  width:100%;
+  margin-bottom:15px;
+}
+
+.user-row{
+  justify-content:flex-end;
+}
+
+.bot-row{
+  justify-content:flex-start;
+}
+
+/* ==========================================
+   USER MESSAGE
+========================================== */
+
+.user-message{
+  max-width:75%;
+
+  background:#2563eb;
+
+  padding:14px 18px;
+
+  border-radius:
+    18px 18px 4px 18px;
+
+  line-height:1.6;
+
+  word-wrap:break-word;
+}
+
+/* ==========================================
+   BOT MESSAGE
+========================================== */
+
+.bot-message{
+  max-width:75%;
+
+  background:#1f2937;
+
+  padding:14px 18px;
+
+  border-radius:
+    18px 18px 18px 4px;
+
+  line-height:1.6;
+
+  word-wrap:break-word;
+}
+
+/* ==========================================
+   INPUT BOX
+========================================== */
+
+textarea{
+  width:100%;
+
+  margin-top:20px;
+
+  background:#111827;
+
+  color:white;
+
+  border:1px solid rgba(255,255,255,.12);
+
+  border-radius:15px;
+
+  padding:15px;
+
+  font-size:16px;
+
+  resize:none;
+
+  outline:none;
+}
+
+textarea:focus{
+  border-color:#2563eb;
+}
+
+/* ==========================================
+   BUTTONS
+========================================== */
+
+.buttons{
+  display:flex;
+  justify-content:center;
+  gap:15px;
+  margin-top:20px;
+  flex-wrap:wrap;
+}
+
+button{
+  border:none;
+
+  background:#2563eb;
+
+  color:white;
+
+  padding:12px 22px;
+
+  border-radius:12px;
+
+  font-size:15px;
+
+  display:flex;
+  align-items:center;
+  gap:8px;
+
+  cursor:pointer;
+
+  transition:.25s;
+}
+
+button:hover{
+  transform:translateY(-2px);
+  background:#1d4ed8;
+}
+
+button:active{
+  transform:scale(.98);
+}
+
+/* ==========================================
+   SUMMARY CARD
+========================================== */
+
+.summary-card{
+  margin-top:25px;
+
+  background:#111827;
+
+  border-radius:15px;
+
+  padding:20px;
+
+  border:
+    1px solid rgba(255,255,255,.08);
+}
+
+.summary-card summary{
+  cursor:pointer;
+  font-size:18px;
+  font-weight:600;
+}
+
+.summary-card pre{
+  white-space:pre-wrap;
+  margin-top:15px;
+  line-height:1.6;
+}
+
+/* ==========================================
+   MOBILE
+========================================== */
+
+@media(max-width:1000px){
+
+  .dashboard{
+    grid-template-columns:1fr;
+  }
+
+  .avatar-video{
+    max-width:260px;
+    height:260px;
+  }
+
+  h1{
+    font-size:32px;
+  }
+
+  .chat-box{
+    height:450px;
+  }
+
+  .user-message,
+  .bot-message{
+    max-width:90%;
+  }
+}
