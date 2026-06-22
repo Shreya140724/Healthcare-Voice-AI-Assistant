@@ -221,25 +221,21 @@ Reschedule appointment 9876543210 from 2026-06-29 11 AM to 2026-06-29 2 PM
 
 ## 📸 Demo Screenshots
 
-### Home Screen
+### Home Screen & Available Slots
 
-![Home Screen](screenshots/home.png)
-
-### Available Slots
-
-![Available Slots](screenshots/available_slots.png)
+![Home Screen](screenshots/U1.jpg)
 
 ### Appointment Booking
 
-![Appointment Booking](screenshots/booking.png)
+![Appointment Booking](screenshots/U2.jpg)
 
-### Retrieve Appointments
+### Retrieve Appointments &  Cancel Appointments
 
-![Retrieve Appointments](screenshots/appointments.png)
+![Retrieve Appointments](screenshots/U3.jpg)
 
 ### Conversation Summary
 
-![Conversation Summary](screenshots/summary.png)
+![Conversation Summary](screenshots/summary.jpg)
 
 
 # 📊 Sample Workflow
