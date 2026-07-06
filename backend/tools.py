@@ -81,7 +81,10 @@ def book_appointment(
 
     return {
         "status": "success",
-        "message": f"Appointment booked on {date} at {time}"
+        "message":
+        f"Your appointment has been booked successfully for "
+        f"{date} at {time}."
+    
     }
 
 
@@ -116,45 +119,39 @@ def retrieve_appointments(phone):
 
     return result
 
-
 # =====================================
 # Cancel Appointment
 # =====================================
 
-def cancel_appointment(
-    phone,
-    date,
-    time
-):
+def cancel_appointment(appointment_id):
 
     db = SessionLocal()
 
     appointment = (
         db.query(Appointment)
-        .filter(
-            Appointment.phone == phone,
-            Appointment.date == date,
-            Appointment.time == time
-        )
+        .filter(Appointment.id == appointment_id)
         .first()
     )
 
     if not appointment:
 
+        db.close()
+
         return {
-            "status": "failed",
-            "message": "Appointment not found"
+            "status":"failed",
+            "message":"Appointment not found."
         }
 
     db.delete(appointment)
+
     db.commit()
 
+    db.close()
+
     return {
-        "status": "success",
-        "message": "Appointment cancelled"
+        "status":"success",
+        "message":"Appointment cancelled successfully."
     }
-
-
 # =====================================
 # Modify Appointment
 # =====================================
@@ -209,7 +206,7 @@ def modify_appointment(
 
     return {
         "status": "success",
-        "message": f"Appointment moved to {new_date} at {new_time}"
+        "message": f"Your appointment has been rescheduled to {new_date} at {new_time}."
     }
 
 
@@ -221,5 +218,5 @@ def end_conversation():
 
     return {
         "status": "success",
-        "message": "Conversation ended"
+        "message": "Thank you for using Healthcare Voice AI. Have a great day!"
     }
