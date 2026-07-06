@@ -18,90 +18,49 @@ from tools import (
 
 conversation_history = []
 
+current_user = {
+    "name": None,
+    "phone": None
+}
+
+pending_action = None
+
 # =====================================
 # System Prompt
 # =====================================
 
 SYSTEM_PROMPT = """
-You are a healthcare appointment assistant.
+You are a Healthcare Voice AI Assistant.
 
-Classify the user's intent.
+Identify ONLY the user's intent.
 
 Possible intents:
 
-1. identify_user
-   Examples:
-   - my phone number is 9876543210
-   - identify me
-
-2. fetch_slots
-   Examples:
-   - available slots
-   - show slots
-   - what times are available
-
-3. book_appointment
-   Examples:
-   - book appointment
-   - schedule appointment
-
-4. retrieve_appointments
-   Examples:
-   - show my appointments
-   - list my bookings
-   - retrieve appointments
-   - what appointments do I have
-
-5. cancel_appointment
-   Examples:
-   - cancel appointment
-   - delete appointment
-   - remove appointment
-
-6. modify_appointment
-   Examples:
-   - move appointment
-   - reschedule appointment
-   - change appointment time
-
-7. end_conversation
-   Examples:
-   - bye
-   - goodbye
+identify_user
+fetch_slots
+book_appointment
+retrieve_appointments
+cancel_appointment
+modify_appointment
+end_conversation
 
 Return ONLY JSON.
 
-Examples:
+Example:
 
 {
-    "intent":"retrieve_appointments",
-    "phone":"9876543210"
-}
-
-{
-    "intent":"cancel_appointment",
-    "phone":"9876543210",
-    "date":"2026-06-25",
-    "time":"10:00 AM"
-}
-
-{
-    "intent":"modify_appointment",
-    "phone":"9876543210",
-    "old_date":"2026-06-25",
-    "old_time":"10:00 AM",
-    "new_date":"2026-06-25",
-    "new_time":"11:00 AM"
+"intent":"book_appointment"
 }
 """
+
 # =====================================
-# Extract JSON safely
+# Extract JSON
 # =====================================
 
 def extract_json(text):
 
     matches = re.findall(
-        r"\{[^{}]*\}",
+        r"\{.*?\}",
         text,
         re.DOTALL
     )
@@ -112,159 +71,176 @@ def extract_json(text):
             return json.loads(match)
 
         except Exception:
-            continue
+            pass
 
     return None
 
+
 # =====================================
-# Ask LLM
+# Detect Intent
 # =====================================
 
 def detect_intent(user_message):
 
-    messages = [
-        {
-            "role": "system",
-            "content": SYSTEM_PROMPT
-        }
-    ]
+    response = ollama.chat(
 
-    for msg in conversation_history:
-        messages.append(msg)
+        model="phi3:mini",
 
-    messages.append(
-        {
-            "role": "user",
-            "content": user_message
-        }
+        messages=[
+            {
+                "role":"system",
+                "content":SYSTEM_PROMPT
+            },
+            {
+                "role":"user",
+                "content":user_message
+            }
+        ]
     )
 
-    response = ollama.chat(
-    model="phi3:mini",
-    messages=messages
-)
-
-    content = response["message"]["content"]
-
-    print("\n===================")
-    print("LLM RESPONSE")
-    print(content)
-    print("===================\n")
-
-    parsed = extract_json(content)
-
-    return parsed
+    return extract_json(
+        response["message"]["content"]
+    )
 
 
+# =====================================
+# Format Appointment List
+# =====================================
+
+def format_appointments(result):
+
+    if len(result) == 0:
+        return "You don't have any appointments."
+
+    text = "Your appointments are:\n\n"
+
+    for index, appt in enumerate(result, start=1):
+
+        text += (
+            f"Appointment {index}\n"
+            f"Patient : {appt['name']}\n"
+            f"Date : {appt['date']}\n"
+            f"Time : {appt['time']}\n\n"
+        )
+
+    return text
+
+# =====================================
+# Format Slots
+# =====================================
+
+def format_slots(result):
+
+    slots=[]
+
+    for slot in result["available_slots"]:
+
+        slot=(
+
+            slot.replace(":00","")
+                .replace("AM"," AM")
+                .replace("PM"," PM")
+                .lstrip("0")
+
+        )
+
+        slots.append(slot)
+
+    return (
+
+        "Available appointment slots are:\n\n"
+
+        +"\n".join(
+
+            f"• {s}"
+
+            for s in slots
+
+        )
+
+        +"\n\nWhich slot would you like to book?"
+
+    )
 # =====================================
 # Main Agent
 # =====================================
 
 def process_user_message(user_message):
 
+    global pending_action
+
     conversation_history.append(
         {
-            "role": "user",
-            "content": user_message
+            "role":"user",
+            "content":user_message
         }
     )
 
-    message_lower = user_message.lower()
+    message_lower=user_message.lower()
 
-    print("\n========================")
-    print("USER:", user_message)
-    print("========================")
+    print("\n======================")
+    print("USER :",user_message)
+    print("======================")
 
-    # ==========================
-    # FETCH SLOTS
-    # ==========================
+    # =====================================
+    # Fetch Slots
+    # =====================================
 
-    if (
-        "available slots" in message_lower
-        or "show slots" in message_lower
-        or "show available slots" in message_lower
-        or "what slots are available" in message_lower
-    ):
+    if any(x in message_lower for x in [
 
-        result = fetch_slots()
-        return {
-            "tool": "fetch_slots",
-            "tool_result": result,
-            "response": f"Available slots are {result['available_slots']}"
+        "available slots",
+        "show slots",
+        "available appointment",
+        "free slots",
+        "slot"
+
+    ]):
+
+        result=fetch_slots()
+
+        return{
+
+            "tool":"fetch_slots",
+            "tool_result":result,
+            "response":format_slots(result)
+
         }
 
-    # ==========================
-    # BOOK APPOINTMENT
-    # ==========================
+    # =====================================
+    # Book Appointment
+    # =====================================
 
-    elif (
-    "book" in message_lower
-    or "schedule" in message_lower
-):
-        phone_match = re.search(
-        r"\b\d{10}\b",
-        user_message
-    )
+    elif any(x in message_lower for x in [
 
-        date_match = re.search(
-            r"\d{4}-\d{2}-\d{2}",
-            user_message
-        )
+        "book",
+        "schedule"
 
-        time_match = re.search(
-            r"\d{1,2}(?::\d{2})?\s?(?:AM|PM)",
-            user_message,
-            re.IGNORECASE
-        )
+    ]):
+        # Start a fresh booking every time
 
-        name_match = re.search(
-        r"for\s+(.+?)\s+on",
-        user_message,
-        re.IGNORECASE
-        )
+        current_user["name"] = None
+        current_user["phone"] = None
+        current_user.pop("date", None)
 
-
-        if (
-            phone_match
-            and date_match
-            and time_match
-    ):
-            name = (
-            name_match.group(1).strip()
-            if name_match
-            else "Patient"
-        )
-
-            result = book_appointment(
-                name,
-                phone_match.group(),
-                date_match.group(),
-                time_match.group().upper()
-            )
-
-            return {
-                "tool": "book_appointment",
-                "tool_result": result,
-                "response": result["message"]
-            }
-
+        pending_action = "book_name"
         return {
-            "tool": None,
-            "response": "Please provide name, phone, date and time."
-        }
+        "tool": None,
+        "response": "Sure! What is the patient's name?"
+    }
 
-    # ==========================
-    # RETRIEVE APPOINTMENTS
-    # ==========================
+    # =====================================
+    # Retrieve Appointments
+    # =====================================
 
-    elif (
-        "show my appointments" in message_lower
-        or "show my appointment" in message_lower
-        or "retrieve appointments" in message_lower
-        or "my bookings" in message_lower
-        or "show appointments" in message_lower
-        or "appointments" in message_lower
-    ):
+    elif any(x in message_lower for x in [
+
+        "show appointments",
+        "show my appointments",
+        "my appointments",
+        "retrieve appointments",
+        "my bookings"
+
+    ]):
 
         phone_match = re.search(
             r"\b\d{10}\b",
@@ -273,185 +249,466 @@ def process_user_message(user_message):
 
         if phone_match:
 
-            result = retrieve_appointments(
-                phone_match.group()
-            )
+            current_user["phone"] = phone_match.group()
 
-            if len(result) == 0:
+        if current_user["phone"] is None:
 
-                return {
-                    "tool": "retrieve_appointments",
-                    "tool_result": result,
-                    "response": "No appointments found."
-                }
-
-            appointments_text = ""
-
-            for appt in result:
-
-                appointments_text += (
-                    f"Appointment {appt['id']}\n"
-                    f"Patient: {appt['name']}\n"
-                    f"Date: {appt['date']}\n"
-                    f"Time: {appt['time']}\n"
-                    f"--------------------\n"
-                )
+            pending_action = "retrieve_phone"
 
             return {
-                "tool": "retrieve_appointments",
-                "tool_result": result,
-                "response": appointments_text
+                "tool": None,
+                "response": "Sure. Please provide your phone number."
             }
 
+        result = retrieve_appointments(
+            current_user["phone"]
+        )
+
         return {
-            "tool": None,
-            "response": "Please provide phone number."
+            "tool": "retrieve_appointments",
+            "tool_result": result,
+            "response": format_appointments(result)
         }
 
-    # ==========================
-    # CANCEL APPOINTMENT
-    # ==========================
+    # =====================================
+    # Cancel Appointment
+    # =====================================
 
-    elif (
-    "cancel" in message_lower
-    or "delete" in message_lower
-    or "remove" in message_lower
-):
+    elif any(x in message_lower for x in [
+
+        "cancel",
+        "delete",
+        "remove"
+
+    ]):
 
         phone_match = re.search(
             r"\b\d{10}\b",
             user_message
         )
 
+        if phone_match:
+
+            current_user["phone"] = phone_match.group()
+
+        id_match = re.search(
+            r"appointment\s*(\d+)",
+            message_lower
+        )
+
+        # ---------------------------------
+        # Cancel using Appointment Number
+        # ---------------------------------
+
+        if id_match:
+
+            if current_user["phone"] is None:
+
+                return {
+                    "tool": None,
+                    "response": "Please provide your phone number."
+                }
+
+            appointments = retrieve_appointments(
+                current_user["phone"]
+            )
+
+            index = int(id_match.group(1)) - 1
+
+            if index < 0 or index >= len(appointments):
+
+                return {
+                    "tool": None,
+                    "response": "Invalid appointment number."
+                }
+
+            appointment_id = appointments[index]["id"]
+
+            result = cancel_appointment(
+                appointment_id
+            )
+
+            return {
+
+                "tool": "cancel_appointment",
+
+                "tool_result": result,
+
+                "response": result["message"]
+
+            }
+
+        # ---------------------------------
+        # Cancel using Date & Time
+        # ---------------------------------
+
         date_match = re.search(
+
             r"\d{4}-\d{2}-\d{2}",
+
             user_message
+
         )
 
         time_match = re.search(
+
             r"\d{1,2}(?::\d{2})?\s?(?:AM|PM)",
+
             user_message,
+
             re.IGNORECASE
+
         )
 
-        if phone_match and date_match and time_match:
+        if current_user["phone"] and date_match and time_match:
 
-            result = cancel_appointment(
-                phone_match.group(),
-                date_match.group(),
-                time_match.group().upper()
+            appointments = retrieve_appointments(
+                current_user["phone"]
             )
 
+            target = None
+
+            for appt in appointments:
+
+                if (
+                    appt["date"] == date_match.group()
+                    and appt["time"] == time_match.group().upper()
+                ):
+
+                    target = appt["id"]
+
+                    break
+
+            if target is None:
+
+                return {
+
+                    "tool": None,
+
+                    "response": "Appointment not found."
+
+                }
+
+            result = cancel_appointment(target)
+
             return {
+
                 "tool": "cancel_appointment",
+
                 "tool_result": result,
+
                 "response": result["message"]
+
             }
 
         return {
+
             "tool": None,
-            "response": "Please provide phone, date and time."
+
+            "response":
+            "Please provide the appointment number or date and time."
+
         }
 
-    # ==========================
-    # MODIFY APPOINTMENT
-    # ==========================
+    # =====================================
+    # Modify Appointment
+    # =====================================
 
-    elif (
-        "move" in message_lower
-        or "reschedule" in message_lower
-        or "change appointment" in message_lower
-    ):
+    elif any(x in message_lower for x in [
 
-        phone_match = re.search(
-            r"\b\d{10}\b",
-            user_message
-        )
+        "modify",
+        "move",
+        "change",
+        "reschedule"
+
+    ]):
+
+        if current_user["phone"] is None:
+
+            return {
+
+                "tool": None,
+
+                "response":"Please provide your phone number."
+
+            }
 
         dates = re.findall(
+
             r"\d{4}-\d{2}-\d{2}",
+
             user_message
+
         )
 
         times = re.findall(
+
             r"\d{1,2}(?::\d{2})?\s?(?:AM|PM)",
+
             user_message,
+
             re.IGNORECASE
+
         )
 
-        if (
-            phone_match
-            and len(dates) >= 2
-            and len(times) >= 2
-        ):
+        if len(dates) == 1:
 
-            result = modify_appointment(
-                phone_match.group(),
-                dates[0],
-                times[0].upper(),
-                dates[1],
-                times[1].upper()
+            dates.append(
+                dates[0]
             )
 
+        if len(times) < 2:
+
             return {
-                "tool": "modify_appointment",
-                "tool_result": result,
-                "response": result["message"]
+
+                "tool":None,
+
+                "response":
+                "Please provide both old and new appointment times."
+
             }
 
+        result = modify_appointment(
+
+            current_user["phone"],
+
+            dates[0],
+
+            times[0].upper(),
+
+            dates[1],
+
+            times[1].upper()
+
+        )
+
         return {
-            "tool": None,
-            "response": "Please provide old and new date/time."
+
+            "tool":"modify_appointment",
+
+            "tool_result":result,
+
+            "response":result["message"]
+
         }
+    # =====================================
+    # End Conversation
+    # =====================================
 
-    # ==========================
-    # END CONVERSATION
-    # ==========================
+    elif any(x in message_lower for x in [
 
-    elif (
-        "bye" in message_lower
-        or "goodbye" in message_lower
-    ):
+        "bye",
+        "goodbye",
+        "exit",
+        "quit",
+        "thank you",
+        "thanks"
+
+    ]):
+
+        pending_action = None
 
         result = end_conversation()
 
         return {
-            "tool": "end_conversation",
-            "tool_result": result,
-            "response": result["message"]
+
+            "tool":"end_conversation",
+
+            "tool_result":result,
+
+            "response":"Thank you for using the Healthcare Voice AI Assistant. Have a great day!"
+
         }
 
-# ==========================
-# FALLBACK
-# ==========================
+    # =====================================
+    # Pending Conversation
+    # =====================================
 
-    # ==========================
-    # LLM FALLBACK
-    # ==========================
+    if pending_action == "retrieve_phone":
 
-    intent_data = detect_intent(user_message)
+        phone_match = re.search(
+            r"\b\d{10}\b",
+            user_message
+        )
 
-    print("\n====================")
-    print("INTENT DATA")
-    print(intent_data)
-    print("====================\n")
+        if phone_match:
 
-    if intent_data:
+            current_user["phone"] = phone_match.group()
+
+            pending_action = None
+
+            result = retrieve_appointments(
+                current_user["phone"]
+            )
+
+            return {
+
+                "tool":"retrieve_appointments",
+
+                "tool_result":result,
+
+                "response":format_appointments(result)
+
+            }
 
         return {
-            "tool": "llm",
-            "tool_result": intent_data,
-            "response": str(intent_data)
+
+            "tool":None,
+
+            "response":"Please enter a valid 10-digit phone number."
+
         }
 
-    return {
-        "tool": None,
-        "response": (
-            "Please choose one of the following:\n\n"
-            "1. Show available slots\n"
-            "2. Book appointment\n"
-            "3. Show appointments\n"
-            "4. Cancel appointment\n"
-            "5. Modify appointment"
+    # =====================================
+    # Book Conversation
+    # =====================================
+
+    if pending_action == "book_name":
+
+        current_user["name"] = user_message.strip()
+
+        pending_action = "book_phone"
+
+        return {
+
+            "tool":None,
+
+            "response":"Please provide your phone number."
+
+        }
+
+
+    if pending_action == "book_phone":
+
+        phone_match = re.search(
+            r"\b\d{10}\b",
+            user_message
         )
+
+        if not phone_match:
+
+            return {
+
+                "tool":None,
+
+                "response":"Please enter a valid 10-digit phone number."
+
+            }
+
+        current_user["phone"] = phone_match.group()
+
+        pending_action = "book_date"
+
+        return {
+
+            "tool":None,
+
+            "response":"Which date would you like to book? (YYYY-MM-DD)"
+
+        }
+
+
+    if pending_action == "book_date":
+
+        date_match = re.search(
+
+            r"\d{4}-\d{2}-\d{2}",
+
+            user_message
+
+        )
+
+        if not date_match:
+
+            return {
+
+                "tool":None,
+
+                "response":"Please enter the date in YYYY-MM-DD format."
+
+            }
+
+        current_user["date"] = date_match.group()
+
+        pending_action = "book_time"
+
+        return {
+
+            "tool":None,
+
+            "response":"Which time would you like?"
+
+        }
+
+
+    if pending_action == "book_time":
+
+        time_match = re.search(
+
+            r"\d{1,2}(?::\d{2})?\s?(?:AM|PM)",
+
+            user_message,
+
+            re.IGNORECASE
+
+        )
+
+        if not time_match:
+
+            return {
+
+                "tool":None,
+
+                "response":"Please provide a valid appointment time."
+
+            }
+
+        result = book_appointment(
+
+            current_user["name"],
+
+            current_user["phone"],
+
+            current_user["date"],
+
+            time_match.group().upper()
+
+        )
+
+        pending_action = None
+
+        return {
+
+            "tool":"book_appointment",
+
+            "tool_result":result,
+
+            "response":result["message"]
+
+        }
+
+    # =====================================
+    # Final Fallback
+    # =====================================
+
+    return {
+
+        "tool":None,
+
+        "response":
+
+        "I can help you with:\n\n"
+
+        "• Show available slots\n"
+
+        "• Book an appointment\n"
+
+        "• View appointments\n"
+
+        "• Cancel an appointment\n"
+
+        "• Modify an appointment\n\n"
+
+        "How may I assist you today?"
+
     }
